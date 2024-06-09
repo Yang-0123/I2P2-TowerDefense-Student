@@ -60,16 +60,26 @@ add_executable(2024_I2P2_TowerDefense_with_answer
         Bullet/MissileBullet.hpp
         Turret/MissileTurret.cpp
         Turret/MissileTurret.hpp
+        Bullet/BigMissileBullet.cpp
+        Bullet/BigMissileBullet.hpp
+        Turret/MyTurret.cpp
+        Turret/MyTurret.hpp
+        Turret/MyShovel.cpp
+        Turret/MyShovel.hpp
         UI/Animation/Plane.cpp
         UI/Animation/Plane.hpp
         Enemy/PlaneEnemy.cpp
         Enemy/PlaneEnemy.hpp
+        Enemy/MyPlane.cpp
+        Enemy/MyPlane.hpp
         Scene/PlayScene.cpp
         Scene/PlayScene.hpp
         Engine/Point.cpp
         Engine/Point.hpp
         Engine/Resources.cpp
         Engine/Resources.hpp
+        UI/Component/InputBox.cpp
+        UI/Component/InputBox.hpp
         UI/Component/Slider.cpp
         UI/Component/Slider.hpp
         Enemy/SoldierEnemy.cpp
@@ -86,12 +96,22 @@ add_executable(2024_I2P2_TowerDefense_with_answer
         Turret/TurretButton.hpp
         Scene/WinScene.cpp
         Scene/WinScene.hpp
+        Enemy/RedTankEnemy.cpp
+        Enemy/RedTankEnemy.hpp
 
         # TODO: [HACKATHON-1-SCENE] (2/4) Add the new scene source files here
         Scene/StartScene.cpp
         Scene/StartScene.h
+        Scene/StageSelectScene.cpp
+        Scene/StageSelectScene.hpp
         Scene/SettingsScene.cpp
         Scene/SettingsScene.hpp
+        Scene/LoseScene.cpp
+        Scene/LoseScene.hpp
+        Scene/ScoreboardScene.cpp
+        Scene/ScoreboardScene.hpp
+        Scene/LoginScene.cpp
+        Scene/LoginScene.hpp
 #        UI/Component/TextInput.cpp
 #        UI/Component/TextInput.hpp
 )

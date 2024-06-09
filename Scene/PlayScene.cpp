@@ -7,6 +7,7 @@
 #include <queue>
 #include <string>
 #include <memory>
+#include <iostream>
 
 #include "Engine/AudioHelper.hpp"
 #include "UI/Animation/DirtyEffect.hpp"
@@ -17,12 +18,16 @@
 #include "Turret/LaserTurret.hpp"
 #include "Turret/MachineGunTurret.hpp"
 #include "Turret/MissileTurret.hpp"
+#include "Turret/MyTurret.hpp"
+#include "Turret/MyShovel.hpp"
 #include "UI/Animation/Plane.hpp"
 #include "Enemy/PlaneEnemy.hpp"
 #include "PlayScene.hpp"
 #include "Engine/Resources.hpp"
 #include "Enemy/SoldierEnemy.hpp"
 #include "Enemy/TankEnemy.hpp"
+#include "Enemy/RedTankEnemy.hpp"
+#include "Enemy/MyPlane.hpp"
 #include "Turret/TurretButton.hpp"
 
 bool PlayScene::DebugMode = false;
@@ -72,6 +77,8 @@ void PlayScene::Initialize() {
 	Engine::Resources::GetInstance().GetBitmap("lose/benjamin-happy.png");
 	// Start BGM.
 	bgmId = AudioHelper::PlayBGM("play.ogg");
+	//cash
+	cashBGMInstance = Engine::Resources::GetInstance().GetSampleInstance("cash.ogg");
 }
 void PlayScene::Terminate() {
 	AudioHelper::StopBGM(bgmId);
@@ -140,6 +147,13 @@ void PlayScene::Update(float deltaTime) {
 				delete EffectGroup;
 				delete UIGroup;
 				delete imgTarget;*/
+				std::ofstream file("../Resource/lives.txt", std::ios::out | std::ios::trunc); // 打开文件并清空内容
+				if (!file.is_open()) {
+					std::cerr << "Error: Unable to open file for saving lives." << std::endl;
+					return;
+				}
+				file << lives;
+				file.close();
 				Engine::GameEngine::GetInstance().ChangeScene("win");
 			}
 			continue;
@@ -164,6 +178,11 @@ void PlayScene::Update(float deltaTime) {
         // TODO: [CUSTOM-ENEMY]: You need to modify 'Resource/enemy1.txt', or 'Resource/enemy2.txt' to spawn the 4th enemy.
         //         The format is "[EnemyId] [TimeDelay] [Repeat]".
         // TODO: [CUSTOM-ENEMY]: Enable the creation of the enemy.
+		case 4:
+			EnemyGroup->AddNewObject(enemy = new RedTankEnemy(SpawnCoordinate.x, SpawnCoordinate.y));
+			break;
+		case 5:
+			EnemyGroup->AddNewObject(enemy = new MyPlane(SpawnCoordinate.x, SpawnCoordinate.y));
 		default:
 			continue;
 		}
@@ -212,15 +231,38 @@ void PlayScene::OnMouseMove(int mx, int my) {
 	imgTarget->Visible = true;
 	imgTarget->Position.x = x * BlockSize;
 	imgTarget->Position.y = y * BlockSize;
+	//shovel
 }
 void PlayScene::OnMouseUp(int button, int mx, int my) {
+	std::cout << "-------MouseUp--------\n";
 	IScene::OnMouseUp(button, mx, my);
 	if (!imgTarget->Visible)
 		return;
 	const int x = mx / BlockSize;
 	const int y = my / BlockSize;
 	if (button & 1) {
-		if (mapState[y][x] != TILE_OCCUPIED) {
+		if (dynamic_cast<MyShovel*>(preview)){
+			if(mapState[y][x] != TILE_OCCUPIED || !CheckSpaceValid(x, y)){
+				Engine::Sprite* sprite;
+				GroundEffectGroup->AddNewObject(sprite = new DirtyEffect("play/target-invalid.png", 1, x * BlockSize + BlockSize / 2, y * BlockSize + BlockSize / 2));
+				sprite->Rotation = 0;
+				return;
+			}
+			auto objects = TowerGroup->GetObjects();
+            for (auto& obj : objects) {
+				cashBGMInstance = AudioHelper::PlaySample("cash.ogg", false, AudioHelper::BGMVolume, 0.0);
+                if (obj->Position.x == x * BlockSize + BlockSize / 2 && obj->Position.y == y * BlockSize + BlockSize / 2) {
+					Turret* turretPtr = dynamic_cast<Turret*>(obj);
+					EarnMoney(turretPtr->GetPrice()/2);
+					TowerGroup->RemoveObject(obj->GetObjectIterator());
+                    mapState[y][x] = TILE_FLOOR; 
+                    break;
+                }
+            }
+            UIGroup->RemoveObject(preview->GetObjectIterator());
+            preview = nullptr;
+		}
+		else if (mapState[y][x] != TILE_OCCUPIED) {
 			if (!preview)
 				return;
 			// Check if valid.
@@ -270,7 +312,9 @@ void PlayScene::OnKeyDown(int keyCode) {
 					return;
 				++it;
 			}
+			//std :: cout << "plane!!!!!!!!!!!!!\n";
 			EffectGroup->AddNewObject(new Plane());
+			EarnMoney(10000);
 		}
 	}
 	if (keyCode == ALLEGRO_KEY_Q) {
@@ -284,6 +328,9 @@ void PlayScene::OnKeyDown(int keyCode) {
 	else if (keyCode == ALLEGRO_KEY_E) {
 		// Hotkey for MissileTurret.
 		UIBtnClicked(2);
+	}else if (keyCode == ALLEGRO_KEY_R) {
+		// Hotkey for MyTurret.
+		UIBtnClicked(3);
 	}
 	// TODO: [CUSTOM-TURRET]: Make specific key to create the turret.
 	else if (keyCode >= ALLEGRO_KEY_0 && keyCode <= ALLEGRO_KEY_9) {
@@ -295,7 +342,7 @@ void PlayScene::Hit() {
 	lives--;
 	UILives->Text = std::string("Life ") + std::to_string(lives);
 	if (lives <= 0) {
-		Engine::GameEngine::GetInstance().ChangeScene("lose-scene");
+		Engine::GameEngine::GetInstance().ChangeScene("lose");
 	}
 }
 int PlayScene::GetMoney() const {
@@ -334,9 +381,21 @@ void PlayScene::ReadMap() {
 			const int num = mapData[i * MapWidth + j];
 			mapState[i][j] = num ? TILE_FLOOR : TILE_DIRT;
 			if (num)
-				TileMapGroup->AddNewObject(new Engine::Image("play/floor.png", j * BlockSize, i * BlockSize, BlockSize, BlockSize));
-			else
-				TileMapGroup->AddNewObject(new Engine::Image("play/dirt.png", j * BlockSize, i * BlockSize, BlockSize, BlockSize));
+				TileMapGroup->AddNewObject(new Engine::Image("play/FieldsTile_38.png", j * BlockSize, i * BlockSize, BlockSize, BlockSize));
+			else{
+				std::string tmp = "";
+				if(i + 1 < MapHeight && mapData[(i+1)*MapWidth+j] == TILE_FLOOR)
+					tmp += "up";
+				if(i-1 >= 0 && mapData[(i-1)*MapWidth + j] == TILE_FLOOR)
+					tmp += "down";
+				if(j+1 < MapWidth && mapData[i*MapWidth + j + 1] == TILE_FLOOR)
+					tmp += "left";
+				if(j-1 >= 0 && mapData[i*MapWidth + j - 1] == TILE_FLOOR)
+					tmp += "right";
+				if(tmp == "")
+					tmp = "normal";
+				TileMapGroup->AddNewObject(new Engine::Image("play/FieldsTile_"+ tmp + ".png", j * BlockSize, i * BlockSize, BlockSize, BlockSize));
+			}
 		}
 	}
 }
@@ -384,6 +443,20 @@ void PlayScene::ConstructUI() {
 		, 1446, 136, MissileTurret::Price);
 	btn->SetOnClickCallback(std::bind(&PlayScene::UIBtnClicked, this, 2));
 	UIGroup->AddNewControlObject(btn);
+	// Button 4
+	btn = new TurretButton("play/floor.png", "play/dirt.png",
+		Engine::Sprite("play/tower-base.png", 1522, 136, 0, 0, 0, 0),
+		Engine::Sprite("play/turret-7.png", 1522, 136, 0, 0, 0, 0)
+		, 1522, 136, LaserTurret::Price);
+	btn->SetOnClickCallback(std::bind(&PlayScene::UIBtnClicked, this, 3));
+	UIGroup->AddNewControlObject(btn);
+	// Button 5 shovel
+	btn = new TurretButton("play/floor.png", "play/dirt.png",
+		Engine::Sprite("play/floor.png", 1294, 208, 0, 0, 0, 0),
+		Engine::Sprite("play/shovel.png", 1294, 208, 0, 0, 0, 0)
+		, 1294, 208, MyShovel::Price);
+	btn->SetOnClickCallback(std::bind(&PlayScene::UIBtnClicked, this, 4));
+	UIGroup->AddNewControlObject(btn);
 	// TODO: [CUSTOM-TURRET]: Create a button to support constructing the turret.
 	int w = Engine::GameEngine::GetInstance().GetScreenSize().x;
 	int h = Engine::GameEngine::GetInstance().GetScreenSize().y;
@@ -403,6 +476,11 @@ void PlayScene::UIBtnClicked(int id) {
 		preview = new LaserTurret(0, 0);
 	else if (id == 2 && money >= MissileTurret::Price)
 		preview = new MissileTurret(0, 0);
+	else if (id == 3 && money >= MyTurret::Price)
+		preview = new MyTurret(0, 0);
+	else if(id == 4){
+		preview = new MyShovel(0, 0);
+	}
 	if (!preview)
 		return;
 	preview->Position = Engine::GameEngine::GetInstance().GetMousePosition();
@@ -414,8 +492,9 @@ void PlayScene::UIBtnClicked(int id) {
 }
 
 bool PlayScene::CheckSpaceValid(int x, int y) {
-	if (x < 0 || x >= MapWidth || y < 0 || y >= MapHeight)
+	if (x < 0 || x >= MapWidth || y < 0 || y >= MapHeight){
 		return false;
+	}
 	auto map00 = mapState[y][x];
 	mapState[y][x] = TILE_OCCUPIED;
 	std::vector<std::vector<int>> map = CalculateBFSDistance();
@@ -423,6 +502,9 @@ bool PlayScene::CheckSpaceValid(int x, int y) {
 	if (map[0][0] == -1)
 		return false;
 	for (auto& it : EnemyGroup->GetObjects()) {
+		if (dynamic_cast<MyPlane*>(it)) {
+            continue;
+        }
 		Engine::Point pnt;
 		pnt.x = floor(it->Position.x / BlockSize);
 		pnt.y = floor(it->Position.y / BlockSize);
@@ -456,6 +538,16 @@ std::vector<std::vector<int>> PlayScene::CalculateBFSDistance() {
 		// TODO: [BFS PathFinding] (1/1): Implement a BFS starting from the most right-bottom block in the map.
 		//               For each step you should assign the corresponding distance to the most right-bottom block.
 		//               mapState[y][x] is TILE_DIRT if it is empty.
+		for(const auto& dir : directions){
+			int nx = p.x + dir.x;
+			int ny = p.y + dir.y;
+
+			if(nx >= 0 && nx < MapWidth && ny >= 0 && ny < MapHeight && 
+				map[ny][nx] == -1 && mapState[ny][nx] == TILE_DIRT){
+				map[ny][nx] = map[p.y][p.x] + 1;
+				que.push(Engine::Point(nx, ny));
+			}
+		}
 	}
 	return map;
 }

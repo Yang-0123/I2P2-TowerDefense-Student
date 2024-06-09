@@ -1,0 +1,13 @@
+{
+    "configurations": [
+    {
+    "name": "macOS",
+    "includePath": [
+    "${workspaceFolder}/**",
+    "/opt/homebrew/Cellar/allegro/5.2.9.0/include"
+    ],
+    "cppStandard": "c++14"
+    }
+    ],
+    "version": 4
+    }
